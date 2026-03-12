@@ -44,6 +44,7 @@ class RotaryEmbedding:
         freqs = mx.outer(t, inv_freq)
         self.cos = mx.cos(freqs)
         self.sin = mx.sin(freqs)
+        mx.eval(self.cos, self.sin)
 
     def __call__(self, x, offset=0):
         T = x.shape[1]
@@ -85,24 +86,14 @@ class CausalSelfAttention(nn.Module):
         q = rotary(q)
         k = rotary(k)
 
-        # GQA: expand kv heads
-        if self.n_kv_head < self.n_head:
-            repeats = self.n_head // self.n_kv_head
-            k = mx.repeat(k, repeats, axis=2)
-            v = mx.repeat(v, repeats, axis=2)
-
-        # Transpose for attention: (B, H, T, D)
+        # Transpose for attention: (B, N, T, D) — GQA handled natively
         q = q.transpose(0, 2, 1, 3)
         k = k.transpose(0, 2, 1, 3)
         v = v.transpose(0, 2, 1, 3)
 
-        # Scaled dot-product attention with causal mask
-        attn = (q @ k.transpose(0, 1, 3, 2)) * self.scale
-        mask = mx.triu(mx.full((T, T), float('-inf')), k=1)
-        attn = attn + mask
-        attn = mx.softmax(attn, axis=-1)
+        # Fast scaled dot-product attention (optimized Metal kernel, handles GQA + causal)
+        y = mx.fast.scaled_dot_product_attention(q, k, v, scale=self.scale, mask="causal")
 
-        y = attn @ v  # (B, H, T, D)
         y = y.transpose(0, 2, 1, 3).reshape(B, T, -1)
         y = self.c_proj(y)
         return y
@@ -243,7 +234,7 @@ t_start = time.time()
 smooth_train_loss = 0
 total_training_time = 0
 step = 0
-warmup_steps = 10  # steps excluded from timing (compilation warmup)
+warmup_steps = 2  # steps excluded from timing (MLX compiles on first call)
 
 while True:
     t0 = time.time()
@@ -255,7 +246,7 @@ while True:
     for micro_step in range(GRAD_ACCUM_STEPS):
         x, y, epoch = next(train_loader)
         loss, grads = loss_and_grad(model, x, y)
-        mx.eval(loss)
+        mx.eval(loss, grads)
         total_loss += loss.item()
 
         if accumulated_grads is None:
@@ -265,10 +256,11 @@ while True:
                 lambda a, b: a + b, accumulated_grads, grads
             )
 
-    # Average gradients
+    # Average gradients and eval once
     accumulated_grads = tree_map(
         lambda g: g / GRAD_ACCUM_STEPS, accumulated_grads
     )
+    mx.eval(accumulated_grads)
     avg_loss = total_loss / GRAD_ACCUM_STEPS
 
     # Update LR schedule
