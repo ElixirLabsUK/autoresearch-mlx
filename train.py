@@ -10,6 +10,7 @@ from dataclasses import dataclass, asdict
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+from mlx.utils import tree_map
 
 from prepare import MAX_SEQ_LEN, TIME_BUDGET, Tokenizer, make_dataloader, evaluate_bpb
 
@@ -46,8 +47,9 @@ class RotaryEmbedding:
 
     def __call__(self, x, offset=0):
         T = x.shape[1]
-        cos = self.cos[offset:offset + T]
-        sin = self.sin[offset:offset + T]
+        # cos/sin: (T, D/2) -> (1, T, 1, D/2) for broadcasting with (B, T, H, D/2)
+        cos = self.cos[offset:offset + T][None, :, None, :]
+        sin = self.sin[offset:offset + T][None, :, None, :]
         # x: (B, T, H, D)
         d = x.shape[-1] // 2
         x1, x2 = x[..., :d], x[..., d:]
@@ -151,7 +153,9 @@ class GPT(nn.Module):
         return logits
 
     def num_params(self):
-        return sum(p.size for _, p in self.parameters().items() if isinstance(p, mx.array))
+        from mlx.utils import tree_flatten
+        leaves = tree_flatten(self.parameters())
+        return sum(p.size for _, p in leaves)
 
 # ---------------------------------------------------------------------------
 # Hyperparameters (edit these directly, no CLI flags needed)
@@ -193,7 +197,7 @@ config = GPTConfig(
 print(f"Model config: {asdict(config)}")
 
 model = GPT(config)
-num_params = sum(p.size for k, p in model.parameters().items() if isinstance(p, mx.array))
+num_params = model.num_params()
 print(f"Parameters: {num_params:,} ({num_params / 1e6:.1f}M)")
 
 total_batch_tokens = BATCH_SIZE * MAX_SEQ_LEN * GRAD_ACCUM_STEPS
@@ -257,12 +261,12 @@ while True:
         if accumulated_grads is None:
             accumulated_grads = grads
         else:
-            accumulated_grads = mx.utils.tree_map(
+            accumulated_grads = tree_map(
                 lambda a, b: a + b, accumulated_grads, grads
             )
 
     # Average gradients
-    accumulated_grads = mx.utils.tree_map(
+    accumulated_grads = tree_map(
         lambda g: g / GRAD_ACCUM_STEPS, accumulated_grads
     )
     avg_loss = total_loss / GRAD_ACCUM_STEPS
