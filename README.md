@@ -34,13 +34,13 @@ The default model is a small GPT (decoder-only transformer) with:
 
 | Parameter | Default |
 |---|---|
-| Layers | 8 |
+| Layers | 6 |
 | Attention heads | 6 |
 | KV heads | 6 (full MHA, set lower for GQA) |
-| Embedding dim | 384 |
+| Embedding dim | 192 |
 | Context length | 2048 |
 | Vocab size | 8192 (BPE) |
-| Parameters | ~10M |
+| Parameters | ~2.5M |
 
 Key architecture choices:
 - **RMSNorm** with `mx.fast.rms_norm` (optimised Metal kernel)
@@ -182,19 +182,19 @@ All tunable hyperparameters are defined at the top of `train.py`:
 
 ```python
 # Model architecture
-DEPTH = 8               # number of transformer layers
+DEPTH = 6               # number of transformer layers
 N_HEAD = 6              # attention heads
 N_KV_HEAD = 6           # key/value heads (set < N_HEAD for GQA)
-N_EMBD = 384            # embedding dimension
+N_EMBD = 192            # embedding dimension
 
 # Optimization
-BATCH_SIZE = 4           # batch size (small for 16GB unified memory)
-LEARNING_RATE = 3e-4     # peak learning rate
+BATCH_SIZE = 16          # larger batch for faster throughput
+LEARNING_RATE = 1e-3     # higher LR for small model
 WEIGHT_DECAY = 0.1       # AdamW weight decay
 WARMUP_RATIO = 0.05      # fraction of time budget for LR warmup
 WARMDOWN_RATIO = 0.5     # fraction for LR cooldown
 FINAL_LR_FRAC = 0.1      # final LR as fraction of peak
-GRAD_ACCUM_STEPS = 8     # gradient accumulation steps
+GRAD_ACCUM_STEPS = 1     # no accumulation needed with larger batch
 ```
 
 ### Learning rate schedule
