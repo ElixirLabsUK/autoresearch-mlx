@@ -330,7 +330,8 @@ def evaluate_bpb(model, tokenizer, batch_size):
         # Cross entropy per token
         logits_flat = logits.reshape(-1, logits.shape[-1])
         targets_flat = y.reshape(-1)
-        log_probs = mx.log_softmax(logits_flat, axis=-1)
+        log_probs = mx.softmax(logits_flat, axis=-1)
+        log_probs = mx.log(log_probs)
         token_losses = -log_probs[mx.arange(targets_flat.shape[0]), targets_flat]
 
         nbytes = token_bytes[targets_flat]
