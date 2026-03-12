@@ -159,13 +159,13 @@ N_KV_HEAD = 6           # key/value heads (set < N_HEAD for GQA)
 N_EMBD = 192            # embedding dimension
 
 # Optimization
-BATCH_SIZE = 16          # larger batch for faster throughput
+BATCH_SIZE = 4           # keep batch small for memory
 LEARNING_RATE = 1e-3     # higher LR for small model
 WEIGHT_DECAY = 0.1       # AdamW weight decay
 WARMUP_RATIO = 0.05      # fraction of time budget for LR warmup
 WARMDOWN_RATIO = 0.5     # fraction for LR cooldown
 FINAL_LR_FRAC = 0.1      # final LR as fraction of peak
-GRAD_ACCUM_STEPS = 1     # no accumulation needed with larger batch
+GRAD_ACCUM_STEPS = 4     # effective batch = 16
 
 # ---------------------------------------------------------------------------
 # Setup
