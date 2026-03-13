@@ -4,3 +4,4 @@ __pycache__/
 run.log
 results.tsv
 uv.lock
+.autoresearch-key
