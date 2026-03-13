@@ -121,3 +121,7 @@ LOOP FOREVER:
 - Smaller models with more steps often beat larger models with fewer steps on limited hardware
 - `mx.fast.rms_norm` and `mx.fast.scaled_dot_product_attention` are optimized Metal kernels — prefer them
 - Gradient checkpointing isn't available in MLX — manage memory via model size and batch size
+
+## Collaborative mode
+
+If `ENSUE_API_KEY` is set (or `.autoresearch-key` exists), you are part of a research swarm. Read `collab.md` for the full protocol. Pick a cool, memorable single-word codename for yourself (e.g. `nova`, `phoenix`, `atlas`) — NOT your Ensue org name, NOT anything with `autoresearch-` in it. Set it with `coord.agent_id = "phoenix"` and call `coord.announce()` at startup. If neither key exists, ignore this — solo mode works fine.
